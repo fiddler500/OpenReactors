@@ -131,8 +131,6 @@ public class ReactorCraft extends DragonAPIMod {
 
 	public static ModLogger logger;
 
-	private boolean isLocked = false;
-
 	public static Item[] items = new Item[ReactorItems.itemList.length];
 	public static Block[] blocks = new Block[ReactorBlocks.blockList.length];
 
@@ -174,30 +172,6 @@ public class ReactorCraft extends DragonAPIMod {
 	@SidedProxy(clientSide="Reika.ReactorCraft.ClientProxy", serverSide="Reika.ReactorCraft.CommonProxy")
 	public static CommonProxy proxy;
 
-	public final boolean isLocked() {
-		return isLocked || RotaryCraft.instance.isLocked();
-	}
-
-	private final boolean checkForLock() {
-		for (int i = 0; i < ReactorItems.itemList.length; i++) {
-			ReactorItems r = ReactorItems.itemList[i];
-			if (!r.isDummiedOut()) {
-				Item id = r.getItemInstance();
-				if (BannedItemReader.instance.containsID(id))
-					return true;
-			}
-		}
-		for (int i = 0; i < ReactorBlocks.blockList.length; i++) {
-			ReactorBlocks r = ReactorBlocks.blockList[i];
-			if (!r.isDummiedOut()) {
-				Block id = r.getBlockInstance();
-				if (BannedItemReader.instance.containsID(id))
-					return true;
-			}
-		}
-		return false;
-	}
-
 	@Override
 	protected HashMap<String, String> getDependencies() {
 		HashMap map = new HashMap();
@@ -219,22 +193,6 @@ public class ReactorCraft extends DragonAPIMod {
 		config.loadSubfolderedConfigFile(evt);
 		config.initProps(evt);
 		proxy.registerSounds();
-
-		isLocked = this.checkForLock();
-		if (this.isLocked()) {
-			ReikaJavaLibrary.pConsole("");
-			ReikaJavaLibrary.pConsole("\t========================================= REACTORCRAFT ===============================================");
-			ReikaJavaLibrary.pConsole("\tNOTICE: It has been detected that third-party plugins are being used to disable parts of ReactorCraft.");
-			ReikaJavaLibrary.pConsole("\tBecause this is frequently done to sell access to mod content, which is against the Terms of Use");
-			ReikaJavaLibrary.pConsole("\tof both Mojang and the mod, the mod has been functionally disabled. No damage will occur to worlds,");
-			ReikaJavaLibrary.pConsole("\tand all machines (including contents) and items already placed or in inventories will remain so,");
-			ReikaJavaLibrary.pConsole("\tbut its machines will not function, recipes will not load, and no renders or textures will be present.");
-			ReikaJavaLibrary.pConsole("\tAll other mods in your installation will remain fully functional.");
-			ReikaJavaLibrary.pConsole("\tTo regain functionality, unban the ReactorCraft content, and then reload the game. All functionality");
-			ReikaJavaLibrary.pConsole("\twill be restored. You may contact Reika for further information on his forum thread.");
-			ReikaJavaLibrary.pConsole("\t=====================================================================================================");
-			ReikaJavaLibrary.pConsole("");
-		}
 
 		logger = new ModLogger(instance, false);
 
@@ -266,8 +224,6 @@ public class ReactorCraft extends DragonAPIMod {
 		PotionCollisionTracker.instance.addPotionID(instance, config.getRadiationPotionID(), PotionRadiation.class);
 		radiation = (PotionRadiation)new PotionRadiation(config.getRadiationPotionID()).setPotionName("Radiation Sickness");
 
-		FMLInterModComms.sendMessage("zzzzzcustomconfigs", "blacklist-mod-as-output", this.getModContainer().getModId());
-
 		this.basicSetup(evt);
 		this.finishTiming();
 	}
@@ -276,12 +232,8 @@ public class ReactorCraft extends DragonAPIMod {
 	@EventHandler
 	public void load(FMLInitializationEvent event) {
 		this.startTiming(LoadPhase.LOAD);
-		if (this.isLocked() && !RotaryCraft.instance.isLocked())
-			PlayerHandler.instance.registerTracker(LockNotification.instance);
-		if (!this.isLocked()) {
 			proxy.registerRenderers();
 			ReactorRecipes.addRecipes();
-		}
 		this.addEntities();
 		NetworkRegistry.INSTANCE.registerGuiHandler(instance, new ReactorGuiHandler());
 		RetroGenController.instance.addHybridGenerator(ReactorOreGenerator.instance, 0, ReactorOptions.RETROGEN.getState());
@@ -300,56 +252,14 @@ public class ReactorCraft extends DragonAPIMod {
 			FMLInterModComms.sendMessage("ForgeMicroblock", "microMaterial", is);
 		}
 
-		PackModificationTracker.instance.addMod(this, config);
-
 		//TickRegistry.instance.registerTickHandler(new VolcanicGasController(), Side.SERVER);
 
-		if (!this.isLocked())
-			IntegrityChecker.instance.addMod(instance, ReactorBlocks.blockList, ReactorItems.itemList);
-
-		VanillaIntegrityTracker.instance.addWatchedBlock(instance, Blocks.bedrock);
-		VanillaIntegrityTracker.instance.addWatchedBlock(instance, Blocks.gold_block);
-		VanillaIntegrityTracker.instance.addWatchedBlock(instance, Blocks.hardened_clay);
 
 		if (ConfigRegistry.HANDBOOK.getState())
 			PlayerFirstTimeTracker.addTracker(new ReactorBookTracker());
 
-		//ReikaEEHelper.blacklistRegistry(ReactorBlocks.blockList);
-		//ReikaEEHelper.blacklistRegistry(ReactorItems.itemList);
-
-		ReikaEEHelper.blacklistEntry(ReactorItems.FUEL);
-		ReikaEEHelper.blacklistEntry(ReactorItems.BREEDERFUEL);
-		ReikaEEHelper.blacklistEntry(ReactorItems.PELLET);
-		ReikaEEHelper.blacklistEntry(ReactorItems.PLUTONIUM);
-		ReikaEEHelper.blacklistEntry(ReactorItems.THORIUM);
-
 		SuggestedModsTracker.instance.addSuggestedMod(instance, ModList.CHROMATICRAFT, "Dense pitchblende generation in its biomes");
 		SuggestedModsTracker.instance.addSuggestedMod(instance, ModList.TWILIGHT, "Dense pitchblende generation in its biomes");
-
-		SensitiveItemRegistry.instance.registerItem(ReactorItems.FUEL.getItemInstance());
-		SensitiveItemRegistry.instance.registerItem(ReactorItems.BREEDERFUEL.getItemInstance());
-		SensitiveItemRegistry.instance.registerItem(ReactorItems.PLUTONIUM.getItemInstance());
-		SensitiveItemRegistry.instance.registerItem(ReactorItems.THORIUM.getItemInstance());
-		SensitiveItemRegistry.instance.registerItem(ReactorItems.PELLET.getItemInstance());
-		SensitiveItemRegistry.instance.registerItem(ReactorStacks.fueldust);
-		SensitiveItemRegistry.instance.registerItem(ReactorStacks.thordust);
-		SensitiveItemRegistry.instance.registerItem(CraftingItems.ALLOY.getItem());
-		SensitiveItemRegistry.instance.registerItem(CraftingItems.FERROINGOT.getItem());
-
-		SensitiveFluidRegistry.instance.registerFluid("rc fusion plasma");
-		SensitiveFluidRegistry.instance.registerFluid("rc deuterium");
-		SensitiveFluidRegistry.instance.registerFluid("rc tritium");
-		SensitiveFluidRegistry.instance.registerFluid("rc hydrofluoric acid");
-		SensitiveFluidRegistry.instance.registerFluid("rc uranium hexafluoride");
-		SensitiveFluidRegistry.instance.registerFluid("rc sodium");
-		SensitiveFluidRegistry.instance.registerFluid("rc chlorine");
-		SensitiveFluidRegistry.instance.registerFluid("rc oxygen");
-		SensitiveFluidRegistry.instance.registerFluid("rc lowpammonia");
-		SensitiveFluidRegistry.instance.registerFluid("rc lowpwater");
-		SensitiveFluidRegistry.instance.registerFluid("rc hotsodium");
-		SensitiveFluidRegistry.instance.registerFluid("rc co2");
-		SensitiveFluidRegistry.instance.registerFluid("rc hot co2");
-		SensitiveFluidRegistry.instance.registerFluid("rc corium");
 
 		this.finishTiming();
 	}
@@ -359,7 +269,6 @@ public class ReactorCraft extends DragonAPIMod {
 	public void postload(FMLPostInitializationEvent evt) {
 		this.startTiming(LoadPhase.POSTLOAD);
 
-		if (!this.isLocked())
 			ReactorRecipes.addModInterface();
 
 		//for (int i = 0; i < FluoriteTypes.colorList.length; i++) {
@@ -373,8 +282,6 @@ public class ReactorCraft extends DragonAPIMod {
 		}
 
 		ReikaJavaLibrary.initClass(ReactorLuaMethods.class);
-
-		proxy.loadDonatorRender();
 
 		if (ModList.CHROMATICRAFT.isLoaded()) {
 			for (int i = 0; i < ReactorTiles.TEList.length; i++) {
@@ -622,14 +529,6 @@ public class ReactorCraft extends DragonAPIMod {
 		if (!this.isMovable(evt.tile)) {
 			evt.setCanceled(true);
 		}
-	}
-
-	@SubscribeEvent(priority = EventPriority.LOWEST)
-	@ModDependent(ModList.BLOODMAGIC)
-	@ClassDependent("WayofTime.alchemicalWizardry.api.event.TeleposeEvent")
-	public void noTelepose(TeleposeEvent evt) {
-		if (!this.isMovable(evt.getInitialTile()) || !this.isMovable(evt.getFinalTile()))
-			evt.setCanceled(true);
 	}
 
 	private boolean isMovable(TileEntity te) {
